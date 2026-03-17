@@ -123,10 +123,10 @@ export default function PostDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t-[3px] border-[rgb(var(--foreground))] p-4">
+        <div className="border-t-[3px] border-[rgb(var(--foreground))] p-4 flex gap-2">
           <button
             onClick={handleCopy}
-            className="neo-btn w-full gap-2 bg-[rgb(var(--primary))] px-4 py-2.5 text-sm text-[rgb(var(--primary-foreground))]"
+            className={`neo-btn flex-1 gap-2 bg-[rgb(var(--primary))] px-4 py-2.5 text-sm text-[rgb(var(--primary-foreground))]`}
           >
             {copied ? (
               <>
@@ -136,10 +136,20 @@ export default function PostDetailModal({
             ) : (
               <>
                 <Icon icon="solar:copy-bold" width={18} />
-                내용 복사하기
+                내용 복사
               </>
             )}
           </button>
+          {post.imageUrl && (
+            <a
+              href={post.imageUrl}
+              download
+              className="neo-btn gap-2 bg-[rgb(var(--content3))] px-4 py-2.5 text-sm"
+            >
+              <Icon icon="solar:download-bold" width={18} />
+              이미지 저장
+            </a>
+          )}
         </div>
       </div>
     </div>
