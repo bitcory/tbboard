@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "prisma generate && prisma migrate deploy && next build && node prisma/seed.mjs",
-    "start": "NODE_ENV=production node server.js",
+    "build": "prisma generate && next build",
+    "start": "prisma migrate deploy && node prisma/seed.mjs && NODE_ENV=production node server.js",
     "lint": "eslint",
     "seed": "node prisma/seed.mjs"
   },
