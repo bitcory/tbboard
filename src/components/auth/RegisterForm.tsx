@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
-export default function LoginForm() {
+export default function RegisterForm() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,16 +19,16 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, name }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "로그인에 실패했습니다.");
+        setError(data.error || "회원가입에 실패했습니다.");
         return;
       }
 
@@ -59,7 +60,7 @@ export default function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="memphis-input"
-          placeholder="아이디를 입력하세요"
+          placeholder="2~20자"
           required
           autoFocus
         />
@@ -75,7 +76,22 @@ export default function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="memphis-input"
-          placeholder="비밀번호를 입력하세요"
+          placeholder="4자 이상"
+          required
+        />
+      </div>
+
+      <div>
+        <label htmlFor="name" className="mb-1.5 block text-sm font-bold uppercase tracking-wider">
+          이름
+        </label>
+        <input
+          id="name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="memphis-input"
+          placeholder="표시될 이름"
           required
         />
       </div>
@@ -88,15 +104,15 @@ export default function LoginForm() {
         {loading ? (
           <div className="neo-spinner" style={{ width: 18, height: 18, borderTopColor: "rgb(var(--primary-foreground))" }} />
         ) : (
-          <Icon icon="solar:login-2-bold" width={18} />
+          <Icon icon="solar:user-plus-bold" width={18} />
         )}
-        {loading ? "로그인 중..." : "로그인"}
+        {loading ? "가입 중..." : "회원가입"}
       </button>
 
       <p className="text-center text-sm text-[rgb(var(--foreground))]/60">
-        계정이 없으신가요?{" "}
-        <Link href="/register" className="font-bold text-[rgb(var(--primary))] hover:underline">
-          회원가입
+        이미 계정이 있으신가요?{" "}
+        <Link href="/login" className="font-bold text-[rgb(var(--primary))] hover:underline">
+          로그인
         </Link>
       </p>
     </form>
