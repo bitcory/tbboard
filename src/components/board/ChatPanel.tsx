@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import type { PostWithAuthor, UserInfo } from "@/types";
 
 interface ChatPanelProps {
   posts: PostWithAuthor[];
   user: UserInfo | null;
+  highlightedPostId: string | null;
   onPostClick: (post: PostWithAuthor) => void;
 }
 
@@ -26,14 +27,29 @@ function getDateLabel(dateStr: string): string {
   return d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
 }
 
-export default function ChatPanel({ posts, onPostClick }: ChatPanelProps) {
+export default function ChatPanel({ posts, highlightedPostId, onPostClick }: ChatPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const setItemRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) itemRefs.current.set(id, el);
+    else itemRefs.current.delete(id);
+  }, []);
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [posts.length]);
+
+  // Scroll to highlighted post
+  useEffect(() => {
+    if (!highlightedPostId) return;
+    const el = itemRefs.current.get(highlightedPostId);
+    if (el && containerRef.current) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightedPostId]);
 
   const sorted = [...posts].reverse();
   let lastDate = "";
@@ -53,9 +69,15 @@ export default function ChatPanel({ posts, onPostClick }: ChatPanelProps) {
           const dateLabel = getDateLabel(post.createdAt);
           const showDate = dateLabel !== lastDate;
           lastDate = dateLabel;
+          const isHighlighted = post.id === highlightedPostId;
 
           return (
-            <div key={post.id} className="card-enter" style={{ "--card-index": idx } as React.CSSProperties}>
+            <div
+              key={post.id}
+              ref={(el) => setItemRef(post.id, el)}
+              className="card-enter"
+              style={{ "--card-index": idx } as React.CSSProperties}
+            >
               {showDate && (
                 <div className="my-3 flex items-center gap-3">
                   <div className="h-[2px] flex-1 bg-[rgb(var(--foreground)/0.1)]" />
@@ -68,7 +90,11 @@ export default function ChatPanel({ posts, onPostClick }: ChatPanelProps) {
 
               <button
                 onClick={() => onPostClick(post)}
-                className="group flex w-full gap-3 rounded-xl border-2 border-transparent p-2.5 text-left transition-all hover:border-[rgb(var(--foreground))] hover:bg-[rgb(var(--content1))] hover:shadow-[var(--shadow-sm)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                className={`group flex w-full gap-3 rounded-xl border-2 p-2.5 text-left transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                  isHighlighted
+                    ? "border-[rgb(var(--primary))] bg-[rgb(var(--content3))] shadow-[var(--shadow-sm)] highlight-pulse"
+                    : "border-transparent hover:border-[rgb(var(--foreground))] hover:bg-[rgb(var(--content1))] hover:shadow-[var(--shadow-sm)]"
+                }`}
               >
                 {/* Avatar */}
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-[rgb(var(--foreground))] bg-[rgb(var(--content3))] text-xs font-black">

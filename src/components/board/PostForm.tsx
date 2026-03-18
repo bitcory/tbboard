@@ -45,12 +45,29 @@ export default function PostForm({
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await onSubmit(content, imageUrl);
+      setContent("");
+      setImageUrl(null);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const uploadFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
       showToast("파일 크기는 10MB 이하여야 합니다.");
       return;
     }
-
     setUploading(true);
     try {
       const formData = new FormData();
@@ -66,21 +83,19 @@ export default function PostForm({
       showToast("업로드 중 오류가 발생했습니다.");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() || submitting) return;
-
-    setSubmitting(true);
-    try {
-      await onSubmit(content, imageUrl);
-      setContent("");
-      setImageUrl(null);
-    } finally {
-      setSubmitting(false);
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) uploadFile(file);
+        return;
+      }
     }
   };
 
@@ -152,6 +167,7 @@ export default function PostForm({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="메시지를 입력하세요..."
           rows={1}
           className="memphis-input max-h-[120px] min-h-[42px] resize-none !py-2.5"

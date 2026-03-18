@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocket } from "@/hooks/useSocket";
@@ -21,6 +21,87 @@ export default function BoardContainer() {
   const [editContent, setEditContent] = useState("");
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"chat" | "board">("chat");
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
+  const dragCounterRef = useRef(0);
+  const cardRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Keep cardOrder in sync with posts
+  useEffect(() => {
+    setCardOrder((prev) => {
+      const postIds = new Set(posts.map((p) => p.id));
+      const existing = prev.filter((id) => postIds.has(id));
+      const existingSet = new Set(existing);
+      const newIds = posts.map((p) => p.id).filter((id) => !existingSet.has(id));
+      return [...newIds, ...existing];
+    });
+  }, [posts]);
+
+  const orderedPosts = useMemo(() => {
+    const postMap = new Map(posts.map((p) => [p.id, p]));
+    return cardOrder.map((id) => postMap.get(id)).filter(Boolean) as PostWithAuthor[];
+  }, [posts, cardOrder]);
+
+  const handleDragStart = (idx: number) => (e: React.DragEvent) => {
+    setDragIndex(idx);
+    dragCounterRef.current = 0;
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (idx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragIndex !== null && idx !== dragIndex) {
+      setDragOverIndex(idx);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (idx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === idx) return;
+    setCardOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(idx, 0, moved);
+      return next;
+    });
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const highlight = useCallback((postId: string) => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedPostId(postId);
+    highlightTimerRef.current = setTimeout(() => setHighlightedPostId(null), 1500);
+  }, []);
+
+  // ChatPanel 클릭 → 카드 하이라이트 + 스크롤
+  const handleChatPostClick = useCallback((post: PostWithAuthor) => {
+    setSelectedPost(post);
+    highlight(post.id);
+    const cardEl = cardRefs.current.get(post.id);
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlight]);
+
+  // 카드 클릭 → 사이드바 하이라이트 + 모달
+  const handleCardClick = useCallback((post: PostWithAuthor) => {
+    setSelectedPost(post);
+    highlight(post.id);
+  }, [highlight]);
 
   const handlePostCreated = useCallback((post: PostWithAuthor) => {
     setPosts((prev) => [post, ...prev]);
@@ -150,7 +231,7 @@ export default function BoardContainer() {
             mobileTab === "chat" ? "flex" : "hidden md:flex"
           }`}
         >
-          <ChatPanel posts={posts} user={user} onPostClick={setSelectedPost} />
+          <ChatPanel posts={posts} user={user} highlightedPostId={highlightedPostId} onPostClick={handleChatPostClick} />
 
           {user && (
             <div className="border-t-[3px] border-[rgb(var(--foreground))] bg-[rgb(var(--content1))] p-3">
@@ -179,12 +260,24 @@ export default function BoardContainer() {
               </div>
             ) : (
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                {posts.map((post, idx) => (
+                {orderedPosts.map((post, idx) => (
                   <PostCard
                     key={post.id}
+                    ref={(el: HTMLButtonElement | null) => {
+                      if (el) cardRefs.current.set(post.id, el);
+                      else cardRefs.current.delete(post.id);
+                    }}
                     post={post}
                     index={idx}
-                    onClick={() => setSelectedPost(post)}
+                    isDragging={dragIndex === idx}
+                    isDragOver={dragOverIndex === idx}
+                    isHighlighted={highlightedPostId === post.id}
+                    onDragStart={handleDragStart(idx)}
+                    onDragOver={handleDragOver(idx)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop(idx)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => handleCardClick(post)}
                   />
                 ))}
               </div>
