@@ -66,12 +66,7 @@ export default function BoardContainer() {
   const handleDrop = (idx: number) => (e: React.DragEvent) => {
     e.preventDefault();
     if (dragIndex === null || dragIndex === idx) return;
-    setCardOrder((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(idx, 0, moved);
-      return next;
-    });
+    handleReorder(dragIndex, idx);
     setDragIndex(null);
     setDragOverIndex(null);
   };
@@ -80,6 +75,16 @@ export default function BoardContainer() {
     setDragIndex(null);
     setDragOverIndex(null);
   };
+
+  // 공용 reorder: ChatPanel과 카드 그리드 양쪽에서 사용
+  const handleReorder = useCallback((fromIdx: number, toIdx: number) => {
+    setCardOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }, []);
 
   const highlight = useCallback((postId: string) => {
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
@@ -231,7 +236,7 @@ export default function BoardContainer() {
             mobileTab === "chat" ? "flex" : "hidden md:flex"
           }`}
         >
-          <ChatPanel posts={posts} user={user} highlightedPostId={highlightedPostId} onPostClick={handleChatPostClick} />
+          <ChatPanel posts={orderedPosts} user={user} highlightedPostId={highlightedPostId} onPostClick={handleChatPostClick} onReorder={handleReorder} />
 
           {user && (
             <div className="border-t-[3px] border-[rgb(var(--foreground))] bg-[rgb(var(--content1))] p-3">

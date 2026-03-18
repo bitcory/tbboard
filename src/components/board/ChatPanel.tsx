@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import type { PostWithAuthor, UserInfo } from "@/types";
 
@@ -9,6 +9,7 @@ interface ChatPanelProps {
   user: UserInfo | null;
   highlightedPostId: string | null;
   onPostClick: (post: PostWithAuthor) => void;
+  onReorder: (fromCardIndex: number, toCardIndex: number) => void;
 }
 
 function getTimeStr(dateStr: string): string {
@@ -27,9 +28,11 @@ function getDateLabel(dateStr: string): string {
   return d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
 }
 
-export default function ChatPanel({ posts, highlightedPostId, onPostClick }: ChatPanelProps) {
+export default function ChatPanel({ posts, highlightedPostId, onPostClick, onReorder }: ChatPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const setItemRef = useCallback((id: string, el: HTMLDivElement | null) => {
     if (el) itemRefs.current.set(id, el);
@@ -51,7 +54,43 @@ export default function ChatPanel({ posts, highlightedPostId, onPostClick }: Cha
     }
   }, [highlightedPostId]);
 
-  const sorted = [...posts].reverse();
+  // ChatPanel shows reversed orderedPosts (newest at bottom = chat style)
+  const displayed = [...posts].reverse();
+  const len = displayed.length;
+
+  // Map chat display index ↔ cardOrder index
+  const toCardIndex = (chatIdx: number) => len - 1 - chatIdx;
+
+  const handleDragStart = (chatIdx: number) => (e: React.DragEvent) => {
+    setDragIdx(chatIdx);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (chatIdx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragIdx !== null && chatIdx !== dragIdx) {
+      setDragOverIdx(chatIdx);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIdx(null);
+  };
+
+  const handleDrop = (chatIdx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === chatIdx) return;
+    onReorder(toCardIndex(dragIdx), toCardIndex(chatIdx));
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
   let lastDate = "";
 
   return (
@@ -59,23 +98,31 @@ export default function ChatPanel({ posts, highlightedPostId, onPostClick }: Cha
       ref={containerRef}
       className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3 sm:px-4"
     >
-      {sorted.length === 0 ? (
+      {displayed.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[rgb(var(--foreground)/0.4)]">
           <Icon icon="solar:chat-dots-bold" width={40} />
           <span className="text-sm font-bold">아직 게시물이 없습니다</span>
         </div>
       ) : (
-        sorted.map((post, idx) => {
+        displayed.map((post, idx) => {
           const dateLabel = getDateLabel(post.createdAt);
           const showDate = dateLabel !== lastDate;
           lastDate = dateLabel;
           const isHighlighted = post.id === highlightedPostId;
+          const isDragging = dragIdx === idx;
+          const isDragOver = dragOverIdx === idx;
 
           return (
             <div
               key={post.id}
               ref={(el) => setItemRef(post.id, el)}
-              className="card-enter"
+              draggable
+              onDragStart={handleDragStart(idx)}
+              onDragOver={handleDragOver(idx)}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop(idx)}
+              onDragEnd={handleDragEnd}
+              className={`card-enter cursor-grab active:cursor-grabbing ${isDragging ? "opacity-40" : ""}`}
               style={{ "--card-index": idx } as React.CSSProperties}
             >
               {showDate && (
@@ -91,11 +138,18 @@ export default function ChatPanel({ posts, highlightedPostId, onPostClick }: Cha
               <button
                 onClick={() => onPostClick(post)}
                 className={`group flex w-full gap-3 rounded-xl border-2 p-2.5 text-left transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
-                  isHighlighted
-                    ? "border-[rgb(var(--primary))] bg-[rgb(var(--content3))] shadow-[var(--shadow-sm)] highlight-pulse"
-                    : "border-transparent hover:border-[rgb(var(--foreground))] hover:bg-[rgb(var(--content1))] hover:shadow-[var(--shadow-sm)]"
+                  isDragOver
+                    ? "border-[rgb(var(--primary))] bg-[rgb(var(--content3))] shadow-[var(--shadow-sm)]"
+                    : isHighlighted
+                      ? "border-[rgb(var(--primary))] bg-[rgb(var(--content3))] shadow-[var(--shadow-sm)] highlight-pulse"
+                      : "border-transparent hover:border-[rgb(var(--foreground))] hover:bg-[rgb(var(--content1))] hover:shadow-[var(--shadow-sm)]"
                 }`}
               >
+                {/* Drag handle */}
+                <div className="flex shrink-0 items-center opacity-30 group-hover:opacity-60 transition-opacity">
+                  <Icon icon="solar:hamburger-menu-linear" width={14} className="text-[rgb(var(--foreground))]" />
+                </div>
+
                 {/* Avatar */}
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-[rgb(var(--foreground))] bg-[rgb(var(--content3))] text-xs font-black">
                   {post.author.name[0]}
